@@ -1,13 +1,13 @@
 import os.path
 import pickle
 import json
-from functools import wraps
+import csv
+
 from googleapiclient.discovery import build
-
 from google_auth_oauthlib.flow import InstalledAppFlow
-
 from google.auth.transport.requests import Request
 
+from .Exceptions import TableValueOverflow, TableNameUniqueness, TableNotFound
 
 
 def get_file_path(file_path: str) -> str:
@@ -77,9 +77,12 @@ class DataDifinition():
                     return id
         return None
 
-    def create_table(self, title, column_names, column_color=[70, 69, 68]):
+    def create_table(self, title, column_names, column_color=None):
+        if column_color is None:
+            column_color = [70, 69, 68]
+
         if self.get_table_id_by_name(title):
-            raise Exception
+            raise TableNameUniqueness(f"Table named {title} already exists!")
 
         request_body = {
             'properties': {
@@ -127,14 +130,19 @@ class DataDifinition():
         self.user_tables.append({result['spreadsheetId']:title})
         return result
 
-    def update_table(self, title, new_title, new_column_names):
+    def update_table(self, title, new_title, new_column_names=None):
         table_id = self.get_table_id_by_name(title)
 
         if not table_id:
-            raise Exception
+            raise TableNotFound(f"Table named {title} not found!")
+
+        if new_column_names is None:
+            new_column_names = self.service.spreadsheets().values().get(spreadsheetId=table_id, range='A1:1').execute().get('values')[0]
+            print(new_column_names)
+
 
         if self.get_table_id_by_name(new_title):
-            raise Exception
+            raise TableNameUniqueness(f"Table named {title} already exists!")
 
         spreadsheet = self.service.spreadsheets().get(spreadsheetId=table_id).execute()
         sheet_properties = spreadsheet['sheets'][0]['properties']
@@ -158,10 +166,8 @@ class DataDifinition():
             body=request_body
         ).execute()
 
-
         if len(new_column_names) > column_count:
-            print('Количество новых названий столбцов превышает количество столбцов в таблице.')
-            return
+            raise TableValueOverflow("The number of new column names exceeds the number of columns in the table.")
         request_body = {
             'requests': [
                 {
@@ -204,29 +210,33 @@ class DataDifinition():
         table_id = self.get_table_id_by_name(title)
 
         if not table_id:
-            raise Exception
+            raise TableNotFound(f"Table named {title} not found!")
 
-        request_body = {
-            'requests': [
-                {
-                    'deleteSheet': {
-                        'sheetId': 0
-                    }
-                }
-            ]
-        }
-
-        result = self.service.spreadsheets().batchUpdate(
-            spreadsheetId=table_id,
-            body=request_body
-        ).execute()
+        # TODO: Нельзя удалить всю таблицу (только листы), хз чё делать
 
         for table in self.user_tables:
             if table.get(table_id):
                 del table[table_id]
                 break
 
-        return result
+    def download_table(self, save_folder, title):
+        table_id = self.get_table_id_by_name(title)
+
+        if not table_id:
+            raise TableNotFound(f"Table named {title} not found!")
+
+        file_path = os.path.join(save_folder, f"{title}.csv")
+
+        response = self.service.spreadsheets().values().get(
+            spreadsheetId=table_id,
+            range='A1:ZZ'
+        ).execute()
+
+        values = response.get('values', [])
+        with open(file_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(values)
+
 
 
 

@@ -6,17 +6,13 @@ if __name__ == '__main__':
         print(dd.user_tables)
 
         column_names = ['Column 1', 'Column 2', 'Column 3']
-        new_sheet_id = dd.create_table('test_del1', column_names)
+        new_sheet_id = dd.create_table('tes221', column_names)
 
         print(dd.user_tables)
-        #
-        # print(dd.get_table_id_by_name("test0"))
-        # new_column_names = ['NewColumn 1', 'Column 2xcvx', 'Column 3']
-        # dd.update_table("test1", "newTable", new_column_names)
-        #
-        # print(dd.user_tables)
 
-        dd.delete_table("test_del")
+        new_column_names = ['NewColumn 1', 'Column 2xcvx', 'Column 3']
+        dd.update_table("tes221", "nesdf31", new_column_names)
 
         print(dd.user_tables)
+
 
