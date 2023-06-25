@@ -1,14 +1,8 @@
 class TableNotFound(Exception):
-    def __init__(self, expression, message):
-        self.expression = expression
-        self.message = message
+    pass
 
 class TableValueOverflow(Exception):
-    def __init__(self, expression, message):
-        self.expression = expression
-        self.message = message
+    pass
 
 class TableNameUniqueness(Exception):
-    def __init__(self, expression, message):
-        self.expression = expression
-        self.message = message
+    pass
