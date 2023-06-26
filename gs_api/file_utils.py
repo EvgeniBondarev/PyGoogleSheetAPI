@@ -56,3 +56,16 @@ class FileUtils:
 
         with open(user_tables_path, 'w') as file:
             json.dump(tables, file)
+    @staticmethod
+    def get_table_id_by_name(table_name: str) -> str or None:
+        user_tables = FileUtils.load_user_tables()
+        for table in user_tables:
+            for id, name in table.items():
+                if name == table_name:
+                    return id
+        return None
+    @staticmethod
+    def get_table_name_by_id(service, table_id: str) -> str:
+        spreadsheet = service.spreadsheets().get(spreadsheetId=table_id).execute()
+        table_name = spreadsheet['properties']['title']
+        return table_name

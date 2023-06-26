@@ -24,7 +24,7 @@ class DataDefinition:
                     return id
         return None
 
-    def create_table(self, title: str, column_names: list[str], column_color: [int, int, int] = None) -> dict:
+    def create_table(self, title: str, column_names: list[str], column_color: [int, int, int] = None) -> str:
         if column_color is None:
             column_color = [70, 69, 68]
 
@@ -76,7 +76,7 @@ class DataDefinition:
 
         self.user_tables.append({result['spreadsheetId']: title})
 
-        return result
+        return f"https://docs.google.com/spreadsheets/d/{result['spreadsheetId']}"
 
     def update_table(self, title: str, new_title: str, new_column_names: list[str] = None) -> dict:
         table_id = self.get_table_id_by_name(title)
