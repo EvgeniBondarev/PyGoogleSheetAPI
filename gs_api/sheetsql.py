@@ -32,13 +32,20 @@ class SheetsQL:
         self.data_manipulation = DataManipulation()
 
     def execute(self, sql_query: str):
+
+        if sql_query[-1] != ";":
+            sql_query += ";"
+
         sql_type = self.__get_query_type(sql_query)
-
+        print(sql_type)
         if sql_type is QueryType.CREATE:
-            self.__execute_create(sql_query)
+            return self.__execute_create(sql_query)
 
-        if sql_type is QueryType.SELECT:
-            self.__execute_select(sql_query)
+        if sql_type is QueryType.ALTER:
+            return self.__execute_alert(sql_query)
+
+        if sql_type is  QueryType.DROP:
+            return  self.__execute_drop(sql_query)
 
 
     def __get_query_type(self, sql_query):
@@ -87,9 +94,79 @@ class SheetsQL:
 
                 with self.data_difinition as dd:
                     result = dd.create_table(table_name, columns)
+
+        return result
+
+
+
+    def __execute_alert(self, sql_query):
+        table_pattern = r'ALTER TABLE (\w+)'
+        table_match = re.search(table_pattern, sql_query)
+        if table_match:
+            table_name = table_match.group(1)
+
+            # Используем регулярное выражение для извлечения столбцов для изменения
+            columns_pattern = r'ALTER COLUMN (.*?);'
+            columns_match = re.search(columns_pattern, sql_query)
+            if columns_match:
+                columns = columns_match.group(1).split(',')
+
+                # Удаляем лишние пробелы и кавычки вокруг имен столбцов
+                columns = [column.strip() for column in columns]
+
+                # Выводим название таблицы и столбцы для изменения
+                print(f"Table: {table_name}")
+                print("Columns to alter:")
+                for column in columns:
+                    print(column)
+
+                with self.data_difinition as dd:
+                    result = dd.update_column(table_name, columns)
+
+                return result
+
+            rename_pattern = r'RENAME COLUMN (\w+) TO (\w+);'
+            rename_match = re.search(rename_pattern, sql_query)
+            if rename_match:
+                old_name = rename_match.group(1)
+                new_name = rename_match.group(2)
+
+                # Выводим имя таблицы, старое и новое названия столбца
+                print(f"Table: {table_name}")
+                print(f"Rename column '{old_name}' to '{new_name}'")
+
+                with self.data_difinition as dd:
+                    result = dd.rename_column(table_name, old_name, new_name)
+
+                return result
+
+            delete_pattern = r'ALTER TABLE (\w+)'
+            delete_match = re.search(delete_pattern, sql_query)
+            if delete_match:
+                delete_name = delete_match.group(1)
+
+                # Используем регулярное выражение для извлечения названия удаляемого столбца
+                column_pattern = r'DROP COLUMN (\w+);'
+                column_match = re.search(column_pattern, sql_query)
+                if column_match:
+                    column_name = column_match.group(1)
+
+                    # Выводим имя таблицы и название удаляемого столбца
+                    print(f"Table: {delete_name}")
+                    print(f"Drop column: {column_name}")
+
+                    with self.data_difinition as dd:
+                        result = dd.delete_column(table_name, column_name)
+
                     return result
 
+    def __execute_drop(self, sql_query):
+        table_pattern = r'DROP TABLE (\w+);'
+        table_match = re.search(table_pattern, sql_query)
+        if table_match:
+            table_name = table_match.group(1)
 
-
-    def __execute_select(self, sql_query):
-        print("select")
+            print(f"Table to drop: {table_name}")
+            with self.data_difinition as dd:
+                        result = dd.drop_table(table_name)
+        return result

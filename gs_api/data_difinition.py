@@ -76,9 +76,9 @@ class DataDefinition:
 
         self.user_tables.append({result['spreadsheetId']: title})
 
-        return f"https://docs.google.com/spreadsheets/d/{result['spreadsheetId']}"
+        return result
 
-    def update_table(self, title: str, new_title: str, new_column_names: list[str] = None) -> dict:
+    def update_column(self, title: str,  new_column_names: list[str] = None) -> dict:
         table_id = self.get_table_id_by_name(title)
 
         if not table_id:
@@ -87,30 +87,9 @@ class DataDefinition:
         if new_column_names is None:
             new_column_names = self.service.spreadsheets().values().get(spreadsheetId=table_id, range='A1:1').execute().get('values')[0]
 
-        if self.get_table_id_by_name(new_title):
-            raise Exception(f"Table named {title} already exists!")
-
         spreadsheet = self.service.spreadsheets().get(spreadsheetId=table_id).execute()
         sheet_properties = spreadsheet['sheets'][0]['properties']
         column_count = sheet_properties['gridProperties']['columnCount']
-
-        request_body = {
-            'requests': [
-                {
-                    'updateSpreadsheetProperties': {
-                        'properties': {
-                            'title': new_title
-                        },
-                        'fields': 'title'
-                    }
-                }
-            ]
-        }
-
-        self.service.spreadsheets().batchUpdate(
-            spreadsheetId=table_id,
-            body=request_body
-        ).execute()
 
         if len(new_column_names) > column_count:
             raise Exception("The number of new column names exceeds the number of columns in the table.")
@@ -146,12 +125,92 @@ class DataDefinition:
             body=request_body
         ).execute()
 
-        for table in self.user_tables:
-            if table.get(table_id):
-                table[table_id] = new_title
-                break
-
         return result
+
+    def rename_column(self, title, column_name, new_column_name):
+        # TODO: переделать под нормальный запрос, как в других методах
+        table_id = self.get_table_id_by_name(title)
+
+        if not table_id:
+            raise Exception(f"Table named {title} not found!")
+
+        result = self.service.spreadsheets().values().get(
+            spreadsheetId=table_id,
+            range=title
+        ).execute()
+
+        values = result.get('values', [])
+
+        if not values:
+            print('В таблице нет данных.')
+            return
+
+        # Проверяем наличие столбца в первой строке таблицы
+        if column_name not in values[0]:
+            print(f'Столбец "{column_name}" не найден в таблице.')
+            return
+
+        # Получаем индекс столбца
+        column_index = values[0].index(column_name)
+
+        # Изменяем название столбца в первой строке
+        values[0][column_index] = new_column_name
+
+        # Обновляем данные в таблице
+        value_range_body = {
+            'values': values
+        }
+
+        update_result = self.service.spreadsheets().values().update(
+            spreadsheetId=table_id,
+            range=title,
+            valueInputOption='USER_ENTERED',
+            body=value_range_body
+        ).execute()
+
+        return update_result
+
+    def delete_column(self, title, column_name):
+        table_id = self.get_table_id_by_name(title)
+
+        if not table_id:
+            raise Exception(f"Table named {title} not found!")
+        range_ = title  # Название листа таблицы
+
+        # Получаем данные из таблицы
+        result = self.service.spreadsheets().values().get(
+            spreadsheetId=table_id,
+            range=range_
+        ).execute()
+
+        values = result.get('values', [])
+
+        if not values:
+            print('В таблице нет данных.')
+            return
+
+        # Проверяем наличие столбца в первой строке таблицы
+        if column_name not in values[0]:
+            print(f'Столбец "{column_name}" не найден в таблице.')
+            return
+
+        column_index = values[0].index(column_name)
+
+
+        requests = [
+                {
+                    'deleteDimension': {
+                        'range': {
+                            'sheetId': 0,
+                            'dimension': 'COLUMNS',
+                            'startIndex': column_index,
+                            'endIndex': column_index + 1
+                        }
+                    }
+                }
+            ]
+        self.service.spreadsheets().batchUpdate(spreadsheetId=str(table_id), body={'requests': requests}).execute()
+
 
     def delete_table(self, title: str):
         table_id = self.get_table_id_by_name(title)
