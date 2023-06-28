@@ -1,7 +1,7 @@
 import re
 from enum import Enum
-from functools import singledispatch
 
+from .Exceptions import *
 from .data_difinition import DataDefinition
 from .data_manipulation import DataManipulation
 from .file_utils import authorization
@@ -31,22 +31,30 @@ class SheetsQL:
         self.data_difinition = DataDefinition()
         self.data_manipulation = DataManipulation()
 
+    # def connect(self, table_data):
+    #     return self.data_manipulation.connect(table_data)
+
     def execute(self, sql_query: str):
 
         if sql_query[-1] != ";":
             sql_query += ";"
 
         sql_type = self.__get_query_type(sql_query)
-        print(sql_type)
+
+        #DDL
         if sql_type is QueryType.CREATE:
             return self.__execute_create(sql_query)
 
         if sql_type is QueryType.ALTER:
             return self.__execute_alert(sql_query)
 
-        if sql_type is  QueryType.DROP:
-            return  self.__execute_drop(sql_query)
+        if sql_type is QueryType.DROP:
+            return self.__execute_drop(sql_query)
 
+        #DML
+        if sql_type is QueryType.SELECT:
+            a =  self.__execute_select(sql_query)
+            return a
 
     def __get_query_type(self, sql_query):
         if re.search(r'^\s*CREATE\s+TABLE', sql_query, re.IGNORECASE):
@@ -77,6 +85,29 @@ class SheetsQL:
 
     def __execute_create(self, sql_query):
 
+        table_pattern = r'CREATE TABLE IF NOT EXISTS (\w+)'
+        table_match = re.search(table_pattern, sql_query)
+        if table_match:
+            table_name = table_match.group(1)
+
+            column_pattern = r'\((.*?)\)'
+            column_match = re.search(column_pattern, sql_query)
+            if column_match:
+                columns = column_match.group(1).split(',')
+
+                columns = [column.strip().strip('"') for column in columns]
+
+                print(f"Table: {table_name}")
+                print(f"Columns: {columns}")
+
+                with self.data_difinition as dd:
+                    try:
+                        result = dd.create_table(table_name, columns)
+                    except TableAlreadyExists:
+                        result = None
+
+            return result
+
         table_pattern = r'CREATE TABLE (\w+)'
         table_match = re.search(table_pattern, sql_query)
         if table_match:
@@ -95,7 +126,8 @@ class SheetsQL:
                 with self.data_difinition as dd:
                     result = dd.create_table(table_name, columns)
 
-        return result
+            return result
+
 
 
 
@@ -170,3 +202,12 @@ class SheetsQL:
             with self.data_difinition as dd:
                         result = dd.drop_table(table_name)
         return result
+
+    def __execute_select(self, sql_query):
+        table_pattern = r'FROM (\w+)'
+        table_match = re.search(table_pattern, sql_query)
+        if table_match:
+            table_name = table_match.group(1)
+            result = self.data_manipulation.select_data(table_name, sql_query)
+
+            return result

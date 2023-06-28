@@ -1,6 +1,7 @@
 import os
 import json
 import pickle
+from .Exceptions import *
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -63,7 +64,8 @@ class FileUtils:
             for id, name in table.items():
                 if name == table_name:
                     return id
-        return None
+
+        raise TableNotFound(table_name)
     @staticmethod
     def get_table_name_by_id(service, table_id: str) -> str:
         spreadsheet = service.spreadsheets().get(spreadsheetId=table_id).execute()

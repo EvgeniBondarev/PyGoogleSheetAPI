@@ -7,15 +7,15 @@ if __name__ == '__main__':
 
     sql.authorization("files//credentials.json")
 
-    #move = sql.execute("CREATE TABLE Test (id, name, gender, age)")
-    # pprint(move)
+    move = sql.execute("CREATE TABLE Test (id, name, gender, age)")
+    pprint(move)
 
     #move = sql.execute("ALTER TABLE Test RENAME COLUMN name TO Nee")
 
     # move = sql.execute("ALTER TABLE Test DROP COLUMN id")
-
-    move = sql.execute("DROP TABLE Test")
-    pprint(move)
+    #
+    # move = sql.execute("SELECT * FROM Test WHERE id = 'Запах'")
+    # pprint(move)
 
 
 

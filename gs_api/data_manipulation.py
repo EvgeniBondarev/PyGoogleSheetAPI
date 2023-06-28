@@ -54,22 +54,32 @@ class DataManipulation:
 
         return result
 
-    def read_all_data_from_sheet(self, table_id, sql_query=None):
-        range_ = self.table_name  # Название листа таблицы
+    def read_all_data_from_sheet(self, title):
+        table_id = FileUtils.get_table_id_by_name(title)
+
+        if not table_id:
+            raise Exception(f"Table named {title} not found!")
 
         result = self.service.spreadsheets().values().get(
-            spreadsheetId=self.table_id,
-            range=range_
+            spreadsheetId=table_id,
+            range=title
         ).execute()
 
         return result.get('values', [])
 
-    def filter_data(self, sql_query, data):
-        # Преобразование данных в DataFrame
-        df = pd.DataFrame(data, columns=['Column1', 'Column122', 'Column312'])
-
-        query = "SELECT * FROM df ORDER BY Column1 DESC"
-        result = ps.sqldf(query)
+    def select_data(self, title, sql_query):
+        data = self.read_all_data_from_sheet(title)
+        columns = data[0]
+        data.pop(0)
 
 
-        return result.values.tolist()
+        df = pd.DataFrame(data, columns=columns)
+        new_sql = sql_query.replace(f" {title} ", f" {df} ")
+
+        print(sql_query)
+        print(new_sql)
+
+        result = ps.sqldf(new_sql, locals())
+
+
+        return result

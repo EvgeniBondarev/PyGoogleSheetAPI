@@ -1,5 +1,7 @@
 from googleapiclient.discovery import build
 
+from .Exceptions import *
+
 from .file_utils import FileUtils
 class DataDefinition:
     def __init__(self):
@@ -16,73 +18,66 @@ class DataDefinition:
     def __authenticate(self):
         creds = FileUtils.load_credentials()
         self.service = build('sheets', 'v4', credentials=creds)
-
-    def get_table_id_by_name(self, table_name: str) -> str or None:
-        for table in self.user_tables:
-            for id, name in table.items():
-                if name == table_name:
-                    return id
         return None
 
     def create_table(self, title: str, column_names: list[str], column_color: [int, int, int] = None) -> str:
         if column_color is None:
             column_color = [70, 69, 68]
 
-        if self.get_table_id_by_name(title):
-            raise Exception(f"Table named {title} already exists!")
+        try:
+            FileUtils.get_table_id_by_name(title)
+        except TableNotFound:
 
-        request_body = {
-            'properties': {
-                'title': title
-            },
-            'sheets': [
-                {
-                    'properties': {
-                        'sheetId': 0,
-                        'title': title,
-                        'gridProperties': {
-                            'columnCount': len(column_names),
-                            'frozenRowCount': 1
-                        }
-                    },
-                    'data': [
-                        {
-                            'startRow': 0,
-                            'startColumn': 0,
-                            'rowData': [
-                                {
-                                    'values': [
-                                        {
-                                            'userEnteredValue': {
-                                                'stringValue': name
-                                            },
-                                            'userEnteredFormat': {
-                                                'backgroundColor': {
-                                                    'red': column_color[0],
-                                                    'green': column_color[1],
-                                                    'blue': column_color[2]
+            request_body = {
+                'properties': {
+                    'title': title
+                },
+                'sheets': [
+                    {
+                        'properties': {
+                            'sheetId': 0,
+                            'title': title,
+                            'gridProperties': {
+                                'columnCount': len(column_names),
+                                'frozenRowCount': 1
+                            }
+                        },
+                        'data': [
+                            {
+                                'startRow': 0,
+                                'startColumn': 0,
+                                'rowData': [
+                                    {
+                                        'values': [
+                                            {
+                                                'userEnteredValue': {
+                                                    'stringValue': name
                                                 },
-                                            }
-                                        } for name in column_names
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        }
-        result = self.service.spreadsheets().create(body=request_body).execute()
+                                                'userEnteredFormat': {
+                                                    'backgroundColor': {
+                                                        'red': column_color[0],
+                                                        'green': column_color[1],
+                                                        'blue': column_color[2]
+                                                    },
+                                                }
+                                            } for name in column_names
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+            result = self.service.spreadsheets().create(body=request_body).execute()
 
-        self.user_tables.append({result['spreadsheetId']: title})
+            self.user_tables.append({result['spreadsheetId']: title})
 
-        return result
+            return result
 
+        raise TableAlreadyExists(title)
     def update_column(self, title: str,  new_column_names: list[str] = None) -> dict:
-        table_id = self.get_table_id_by_name(title)
-
-        if not table_id:
-            raise Exception(f"Table named {title} not found!")
+        table_id = FileUtils.get_table_id_by_name(title)
 
         if new_column_names is None:
             new_column_names = self.service.spreadsheets().values().get(spreadsheetId=table_id, range='A1:1').execute().get('values')[0]
@@ -92,7 +87,7 @@ class DataDefinition:
         column_count = sheet_properties['gridProperties']['columnCount']
 
         if len(new_column_names) > column_count:
-            raise Exception("The number of new column names exceeds the number of columns in the table.")
+            raise TableWrongSize(title)
 
         request_body = {
             'requests': [
@@ -129,10 +124,7 @@ class DataDefinition:
 
     def rename_column(self, title, column_name, new_column_name):
         # TODO: переделать под нормальный запрос, как в других методах
-        table_id = self.get_table_id_by_name(title)
-
-        if not table_id:
-            raise Exception(f"Table named {title} not found!")
+        table_id = FileUtils.get_table_id_by_name(title)
 
         result = self.service.spreadsheets().values().get(
             spreadsheetId=table_id,
@@ -171,16 +163,11 @@ class DataDefinition:
         return update_result
 
     def delete_column(self, title, column_name):
-        table_id = self.get_table_id_by_name(title)
+        table_id = FileUtils.get_table_id_by_name(title)
 
-        if not table_id:
-            raise Exception(f"Table named {title} not found!")
-        range_ = title  # Название листа таблицы
-
-        # Получаем данные из таблицы
         result = self.service.spreadsheets().values().get(
             spreadsheetId=table_id,
-            range=range_
+            range=title
         ).execute()
 
         values = result.get('values', [])
@@ -189,7 +176,6 @@ class DataDefinition:
             print('В таблице нет данных.')
             return
 
-        # Проверяем наличие столбца в первой строке таблицы
         if column_name not in values[0]:
             print(f'Столбец "{column_name}" не найден в таблице.')
             return
@@ -209,18 +195,18 @@ class DataDefinition:
                     }
                 }
             ]
-        self.service.spreadsheets().batchUpdate(spreadsheetId=str(table_id), body={'requests': requests}).execute()
+        result = self.service.spreadsheets().batchUpdate(spreadsheetId=str(table_id), body={'requests': requests}).execute()
+        return result
 
+    def drop_table(self, title: str):
+        table_id = FileUtils.get_table_id_by_name(title)
 
-    def delete_table(self, title: str):
-        table_id = self.get_table_id_by_name(title)
-
-        if not table_id:
-            raise Exception(f"Table named {title} not found!")
 
         # TODO: Нельзя удалить всю таблицу (только листы), хз чё делать
 
         for table in self.user_tables:
-            if table.get(table_id):
-                del table[table_id]
-                break
+            if table_id in table:
+                self.user_tables.remove(table)
+                return True
+
+        return False
