@@ -53,8 +53,13 @@ class SheetsQL:
 
         #DML
         if sql_type is QueryType.SELECT:
-            a =  self.__execute_select(sql_query)
+            #TODO: Трабл
+            a = self.__execute_select(sql_query)
             return a
+
+        if sql_type is QueryType.INSERT:
+            return self.__execute_inset(sql_query)
+
 
     def __get_query_type(self, sql_query):
         if re.search(r'^\s*CREATE\s+TABLE', sql_query, re.IGNORECASE):
@@ -97,9 +102,6 @@ class SheetsQL:
 
                 columns = [column.strip().strip('"') for column in columns]
 
-                print(f"Table: {table_name}")
-                print(f"Columns: {columns}")
-
                 with self.data_difinition as dd:
                     try:
                         result = dd.create_table(table_name, columns)
@@ -120,9 +122,6 @@ class SheetsQL:
 
                 columns = [column.strip().strip('"') for column in columns]
 
-                print(f"Table: {table_name}")
-                print(f"Columns: {columns}")
-
                 with self.data_difinition as dd:
                     result = dd.create_table(table_name, columns)
 
@@ -137,18 +136,13 @@ class SheetsQL:
         if table_match:
             table_name = table_match.group(1)
 
-            # Используем регулярное выражение для извлечения столбцов для изменения
             columns_pattern = r'ALTER COLUMN (.*?);'
             columns_match = re.search(columns_pattern, sql_query)
             if columns_match:
                 columns = columns_match.group(1).split(',')
 
-                # Удаляем лишние пробелы и кавычки вокруг имен столбцов
                 columns = [column.strip() for column in columns]
 
-                # Выводим название таблицы и столбцы для изменения
-                print(f"Table: {table_name}")
-                print("Columns to alter:")
                 for column in columns:
                     print(column)
 
@@ -163,10 +157,6 @@ class SheetsQL:
                 old_name = rename_match.group(1)
                 new_name = rename_match.group(2)
 
-                # Выводим имя таблицы, старое и новое названия столбца
-                print(f"Table: {table_name}")
-                print(f"Rename column '{old_name}' to '{new_name}'")
-
                 with self.data_difinition as dd:
                     result = dd.rename_column(table_name, old_name, new_name)
 
@@ -177,15 +167,10 @@ class SheetsQL:
             if delete_match:
                 delete_name = delete_match.group(1)
 
-                # Используем регулярное выражение для извлечения названия удаляемого столбца
                 column_pattern = r'DROP COLUMN (\w+);'
                 column_match = re.search(column_pattern, sql_query)
                 if column_match:
                     column_name = column_match.group(1)
-
-                    # Выводим имя таблицы и название удаляемого столбца
-                    print(f"Table: {delete_name}")
-                    print(f"Drop column: {column_name}")
 
                     with self.data_difinition as dd:
                         result = dd.delete_column(table_name, column_name)
@@ -211,3 +196,32 @@ class SheetsQL:
             result = self.data_manipulation.select_data(table_name, sql_query)
 
             return result
+    def __execute_inset(self, sql_query):
+        table_pattern = r'INSERT INTO (\w+)'
+        table_match = re.search(table_pattern, sql_query)
+        columns = values = table_name = None
+        if table_match:
+            table_name = table_match.group(1)
+
+            values_pattern = r'VALUES \((.*?)\)'
+            values_match = re.search(values_pattern, sql_query)
+            if values_match:
+                values = values_match.group(1).split(',')
+
+                values = [value.strip() for value in values]
+
+            column_pattern = rf'{table_name} \((.*?)\)'
+            column_match = re.search(column_pattern, sql_query)
+            if column_match:
+                columns = column_match.group(1).split(',')
+
+                columns = [column.strip() for column in columns]
+
+            result = self.data_manipulation.insert_data(table_name, values, columns)
+
+            print(table_name)
+            print(columns)
+            print(values)
+
+            return result
+
