@@ -1,6 +1,9 @@
 class SheetsQLException(Exception):
      """Basic class"""
 
+class ConnectionError(SheetsQLException):
+    def __init__(self):
+        super().__init__(f"Not connected to GoogleShet table! 'SheetsQL().connect(GsDataBase(id, name))'")
 class TableAlreadyExists(SheetsQLException):
     def __init__(self, table_name):
         super().__init__(f"Table named '{table_name}' already exists!" )

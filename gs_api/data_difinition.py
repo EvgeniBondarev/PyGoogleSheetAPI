@@ -1,93 +1,121 @@
-from googleapiclient.discovery import build
-
 from .Exceptions import *
 
-from .file_utils import FileUtils
-class DataDefinition:
-    def __init__(self):
-        self.service = None
-        self.__authenticate()
+from .dataclasses import GsDataBase
+from .BaseData import BaseData
 
-    def __enter__(self):
-        self.user_tables = FileUtils.load_user_tables()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        FileUtils.save_user_tables(self.user_tables)
-
-    def __authenticate(self):
-        creds = FileUtils.load_credentials()
-        self.service = build('sheets', 'v4', credentials=creds)
-        return None
-
-    def create_table(self, title: str, column_names: list[str], column_color: [int, int, int] = None) -> str:
-        if column_color is None:
-            column_color = [70, 69, 68]
-
-        try:
-            FileUtils.get_table_id_by_name(title)
-        except TableNotFound:
-
-            request_body = {
-                'properties': {
-                    'title': title
-                },
-                'sheets': [
-                    {
-                        'properties': {
-                            'sheetId': 0,
-                            'title': title,
-                            'gridProperties': {
-                                'columnCount': len(column_names),
-                                'frozenRowCount': 1
-                            }
-                        },
-                        'data': [
-                            {
-                                'startRow': 0,
-                                'startColumn': 0,
-                                'rowData': [
-                                    {
-                                        'values': [
-                                            {
-                                                'userEnteredValue': {
-                                                    'stringValue': name
-                                                },
-                                                'userEnteredFormat': {
-                                                    'backgroundColor': {
-                                                        'red': column_color[0],
-                                                        'green': column_color[1],
-                                                        'blue': column_color[2]
-                                                    },
-                                                }
-                                            } for name in column_names
-                                        ]
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
+from typing import List, Optional, Tuple
+class DataDefinition(BaseData):
+    def create_database(self, spreadsheet_name: str) -> GsDataBase:
+        request_body = {
+            'properties': {
+                'title': spreadsheet_name
             }
-            result = self.service.spreadsheets().create(body=request_body).execute()
+        }
+        response = self.service.spreadsheets().create(body=request_body).execute()
 
-            self.user_tables.append({result['spreadsheetId']: title})
+        return GsDataBase(id=response['spreadsheetId'], name=response['properties']['title'])
+    def create_table(self,  sheet_name: str,
+                            column_names: List[str],
+                            column_colors: Optional[List[Tuple[float, float, float]]] = None) -> dict:
 
-            return result
+        if column_colors is None:
+            column_colors = [(0.85, 0.85, 0.85)] * len(column_names)
 
-        raise TableAlreadyExists(title)
-    def update_column(self, title: str,  new_column_names: list[str] = None) -> dict:
-        table_id = FileUtils.get_table_id_by_name(title)
+        requests = [{
+            'addSheet': {
+                'properties': {
+                    'title': sheet_name
+                }
+            }
+        }]
+
+        response = self.service.spreadsheets().batchUpdate(
+            spreadsheetId=self.table_id,
+            body={'requests': requests}
+        ).execute()
+
+
+        new_sheet_id = response['replies'][0]['addSheet']['properties']['sheetId']
+
+        update_requests = []
+        update_requests.append({
+            'updateSheetProperties': {
+                'properties': {
+                    'sheetId': new_sheet_id,
+                    'gridProperties': {
+                        'columnCount': len(column_names),
+                        'frozenRowCount': 1
+                    }
+                },
+                'fields': 'gridProperties(columnCount,frozenRowCount)'
+            }
+        })
+
+        for i, column_name in enumerate(column_names):
+            update_requests.append({
+                'updateCells': {
+                    'rows': [{
+                        'values': [{
+                            'userEnteredValue': {
+                                'stringValue': column_name
+                            },
+                            'userEnteredFormat': {
+                                'textFormat': {
+                                    'bold': True
+                                }
+                            }
+                        }]
+                    }],
+                    'fields': 'userEnteredValue,userEnteredFormat.textFormat.bold',
+                    'start': {
+                        'sheetId': new_sheet_id,
+                        'rowIndex': 0,
+                        'columnIndex': i
+                    }
+                }
+            })
+
+        for i, column_color in enumerate(column_colors):
+            update_requests.append({
+                'updateCells': {
+                    'rows': [{
+                        'values': [{
+                            'userEnteredFormat': {
+                                'backgroundColor': {
+                                    'red': column_color[0],
+                                    'green': column_color[1],
+                                    'blue': column_color[2],
+                                    'alpha': 1
+                                }
+                            }
+                        }]
+                    }],
+                    'fields': 'userEnteredFormat.backgroundColor',
+                    'start': {
+                        'sheetId': new_sheet_id,
+                        'rowIndex': 0,
+                        'columnIndex': i
+                    }
+                }
+            })
+
+        self.service.spreadsheets().batchUpdate(
+                spreadsheetId=self.table_id,
+                body={'requests': update_requests}
+        ).execute()
+
+        return response
+    def alert_column(self, sheet_title: str,  new_column_names: list[str] = None) -> dict:
 
         if new_column_names is None:
-            new_column_names = self.service.spreadsheets().values().get(spreadsheetId=table_id, range='A1:1').execute().get('values')[0]
+            new_column_names = self.service.spreadsheets().values().get(spreadsheetId=self.table_id, range='A1:1').execute().get('values')[0]
 
-        spreadsheet = self.service.spreadsheets().get(spreadsheetId=table_id).execute()
-        sheet_properties = spreadsheet['sheets'][0]['properties']
+        sheet_properties = self.get_sheet_properties_by_name(sheet_title)
+
         column_count = sheet_properties['gridProperties']['columnCount']
 
         if len(new_column_names) > column_count:
-            raise TableWrongSize(title)
+            raise TableWrongSize(sheet_title)
 
         request_body = {
             'requests': [
@@ -116,97 +144,94 @@ class DataDefinition:
         }
 
         result = self.service.spreadsheets().batchUpdate(
-            spreadsheetId=table_id,
+            spreadsheetId=self.table_id,
             body=request_body
         ).execute()
 
         return result
 
-    def rename_column(self, title, column_name, new_column_name):
-        # TODO: переделать под нормальный запрос, как в других методах
-        table_id = FileUtils.get_table_id_by_name(title)
+    def rename_column(self, sheet_title: str, old_column_name: str, new_column_name: str) -> dict:
 
-        result = self.service.spreadsheets().values().get(
-            spreadsheetId=table_id,
-            range=title
-        ).execute()
-
-        values = result.get('values', [])
-
-        if not values:
-            print('В таблице нет данных.')
-            return
-
-        # Проверяем наличие столбца в первой строке таблицы
-        if column_name not in values[0]:
-            print(f'Столбец "{column_name}" не найден в таблице.')
-            return
-
-        # Получаем индекс столбца
-        column_index = values[0].index(column_name)
-
-        # Изменяем название столбца в первой строке
-        values[0][column_index] = new_column_name
-
-        # Обновляем данные в таблице
-        value_range_body = {
-            'values': values
-        }
-
-        update_result = self.service.spreadsheets().values().update(
-            spreadsheetId=table_id,
-            range=title,
-            valueInputOption='USER_ENTERED',
-            body=value_range_body
-        ).execute()
-
-        return update_result
-
-    def delete_column(self, title, column_name):
-        table_id = FileUtils.get_table_id_by_name(title)
-
-        result = self.service.spreadsheets().values().get(
-            spreadsheetId=table_id,
-            range=title
-        ).execute()
-
-        values = result.get('values', [])
-
-        if not values:
-            print('В таблице нет данных.')
-            return
-
-        if column_name not in values[0]:
-            print(f'Столбец "{column_name}" не найден в таблице.')
-            return
-
-        column_index = values[0].index(column_name)
+        sheet_properties = self.get_sheet_properties_by_name(sheet_title)
+        sheet_id = sheet_properties['sheetId']
+        old_column_index = self.get_column_index_by_name(sheet_title, old_column_name)
 
 
         requests = [
-                {
-                    'deleteDimension': {
-                        'range': {
-                            'sheetId': 0,
-                            'dimension': 'COLUMNS',
-                            'startIndex': column_index,
-                            'endIndex': column_index + 1
+            {
+                'updateCells': {
+                    'rows': [
+                        {
+                            'values': [
+                                {
+                                    'userEnteredValue': {
+                                        'stringValue': new_column_name
+                                    }
+                                }
+                            ]
                         }
+                    ],
+                    'fields': 'userEnteredValue',
+                    'start': {
+                        'sheetId': sheet_id,
+                        'rowIndex': 0,
+                        'columnIndex': old_column_index
                     }
                 }
-            ]
-        result = self.service.spreadsheets().batchUpdate(spreadsheetId=str(table_id), body={'requests': requests}).execute()
-        return result
+            }
+        ]
 
-    def drop_table(self, title: str):
-        table_id = FileUtils.get_table_id_by_name(title)
+        response = self.service.spreadsheets().batchUpdate(
+            spreadsheetId=self.table_id,
+            body={'requests': requests}
+        ).execute()
+
+        return response
 
 
-        # TODO: Нельзя удалить всю таблицу (только листы), хз чё делать
+    def delete_column(self, sheet_title: str, column_name: str) -> dict:
+        sheet_properties = self.get_sheet_properties_by_name(sheet_title)
 
-        for table in self.user_tables:
-            if table_id in table:
-                self.user_tables.remove(table)
-                return True
+        sheet_id = sheet_properties['sheetId']
+        column_index = self.get_column_index_by_name(sheet_title, column_name)
 
-        return False
+        requests = [
+            {
+                'deleteDimension': {
+                    'range': {
+                        'sheetId': sheet_id,
+                        'dimension': 'COLUMNS',
+                        'startIndex': column_index,
+                        'endIndex': column_index + 1
+                    }
+                }
+            }
+        ]
+
+        response = self.service.spreadsheets().batchUpdate(
+            spreadsheetId=self.table_id,
+            body={'requests': requests}
+        ).execute()
+
+        return response
+
+    def drop_table(self, sheet_title: str) -> dict:
+
+        sheet_properties = self.get_sheet_properties_by_name(sheet_title)
+
+        sheet_id = sheet_properties['sheetId']
+
+        requests = [
+            {
+                'deleteSheet': {
+                    'sheetId': sheet_id
+                }
+            }
+        ]
+
+        response = self.service.spreadsheets().batchUpdate(
+            spreadsheetId=self.table_id,
+            body={'requests': requests}
+        ).execute()
+
+        return response
