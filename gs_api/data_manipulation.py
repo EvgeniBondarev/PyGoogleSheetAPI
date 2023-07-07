@@ -1,12 +1,18 @@
 import pandas as pd
 import pandasql as ps
 from typing import List
+from enum import Enum
 
 from .Exceptions import *
 from .BaseData import BaseData
+from .dataclasses import Answer
+from .configuration import RESPONSE_TYPE
 
 
-
+class ResponseType(Enum):
+    DataFrame = "DataFrame"
+    List = "List"
+    Value = "Value"
 class DataManipulation(BaseData):
 
     def read_all_data_from_sheet(self, title):
@@ -17,7 +23,10 @@ class DataManipulation(BaseData):
 
         return result.get('values', [])
 
-    def select_data(self, title: str, sql_query: str):
+    def select_data(self, title: str,
+                    sql_query: str,
+                    response_type: ResponseType = RESPONSE_TYPE) -> Answer:
+
         data = self.read_all_data_from_sheet(title)
 
         columns = data[0]
@@ -29,8 +38,14 @@ class DataManipulation(BaseData):
 
         result = ps.sqldf(new_query)
 
-        print(self.__dataframe_to_value(result))
-        return self.__dataframe_to_value(result)
+        if response_type is ResponseType.Value:
+            return Answer(Request={"request": sql_query}, Response=self.__dataframe_to_value(result))
+
+        if response_type is ResponseType.List:
+            return Answer(Request={"request": sql_query}, Response=result.values.tolist())
+
+        if response_type is ResponseType.DataFrame:
+            return Answer(Request={"request": sql_query}, Response=result)
 
     def __dataframe_to_value(self, dataframe):
         dataframe_len = len(dataframe.values.tolist())
@@ -43,7 +58,7 @@ class DataManipulation(BaseData):
             else:
                 return dataframe.values.tolist()[0][0]
 
-    def insert_data(self, title: str, data: str, columns: List[str]=None):
+    def insert_data(self, title: str, data: str, columns: List[str]=None) -> Answer:
 
         result = self.service.spreadsheets().values().get(
             spreadsheetId=self.table_id,
@@ -84,7 +99,7 @@ class DataManipulation(BaseData):
             'values': values
         }
 
-        update_result = self.service.spreadsheets().values().append(
+        response = self.service.spreadsheets().values().append(
             spreadsheetId=self.table_id,
             range=title,
             valueInputOption='USER_ENTERED',
@@ -92,7 +107,60 @@ class DataManipulation(BaseData):
             body=value_range_body
         ).execute()
 
-        return update_result
+        return Answer(Request=value_range_body, Response=response)
+
+    def delete_rows(self, title: str, sql_query: str) -> Answer:
+        values_to_delete = self.select_data(title, sql_query, ResponseType.List)
+        print(values_to_delete)
+
+        range_name = f'{title}!A2:ZZ'
+        result = self.service.spreadsheets().values().get(
+            spreadsheetId=self.table_id,
+            range=range_name).execute()
+
+        values = result.get('values', [])
+
+        sheet_properties = self.get_sheet_properties_by_name(title)
+        sheet_id = sheet_properties['sheetId']
+
+        if not values:
+            return Answer(Request=None, Response={"response": "Table is empty"})
+
+        rows_to_delete = []
+
+        for i, row in enumerate(values):
+            print(row)
+            if row in values_to_delete:
+                rows_to_delete.append(i + 1)
+
+        rows_to_delete.sort(reverse=True)# Это полная жопа
+
+
+        if not rows_to_delete:
+            return Answer(Request=None, Response={"response": "Rows to delete not found"})
+
+        request = [
+                {
+                    'deleteDimension': {
+                    'range': {
+                        'sheetId': sheet_id,
+                        'dimension': 'ROWS',
+                        'startIndex': row_index,
+                        'endIndex': row_index + 1
+                        }
+                    }
+
+                }
+                for row_index in rows_to_delete
+
+            ]
+
+        response = self.service.spreadsheets().batchUpdate(
+                    spreadsheetId=self.table_id,
+                    body={'requests': request}
+                ).execute()
+
+        return Answer(Request=request, Response=response)
 
 
 

@@ -1,7 +1,8 @@
 from .Exceptions import *
 
-from .dataclasses import GsDataBase
+from .dataclasses import GsDataBase, Answer
 from .BaseData import BaseData
+from .configuration import *
 
 from typing import List, Optional, Tuple
 class DataDefinition(BaseData):
@@ -16,12 +17,12 @@ class DataDefinition(BaseData):
         return GsDataBase(id=response['spreadsheetId'], name=response['properties']['title'])
     def create_table(self,  sheet_name: str,
                             column_names: List[str],
-                            column_colors: Optional[List[Tuple[float, float, float]]] = None) -> dict:
+                            column_colors: Optional[List[Tuple[float, float, float]]] = None) -> Answer:
 
         if column_colors is None:
-            column_colors = [(0.85, 0.85, 0.85)] * len(column_names)
+            column_colors = COLUMN_COLOR * len(column_names)
 
-        requests = [{
+        request = [{
             'addSheet': {
                 'properties': {
                     'title': sheet_name
@@ -31,7 +32,7 @@ class DataDefinition(BaseData):
 
         response = self.service.spreadsheets().batchUpdate(
             spreadsheetId=self.table_id,
-            body={'requests': requests}
+            body={'requests': request}
         ).execute()
 
 
@@ -99,13 +100,13 @@ class DataDefinition(BaseData):
                 }
             })
 
-        self.service.spreadsheets().batchUpdate(
+        response = self.service.spreadsheets().batchUpdate(
                 spreadsheetId=self.table_id,
                 body={'requests': update_requests}
         ).execute()
 
-        return response
-    def alert_column(self, sheet_title: str,  new_column_names: list[str] = None) -> dict:
+        return Answer(Request=request, Response=response)
+    def alert_column(self, sheet_title: str,  new_column_names: list[str] = None) -> Answer:
 
         if new_column_names is None:
             new_column_names = self.service.spreadsheets().values().get(spreadsheetId=self.table_id, range='A1:1').execute().get('values')[0]
@@ -117,7 +118,7 @@ class DataDefinition(BaseData):
         if len(new_column_names) > column_count:
             raise TableWrongSize(sheet_title)
 
-        request_body = {
+        request = {
             'requests': [
                 {
                     'updateCells': {
@@ -143,21 +144,21 @@ class DataDefinition(BaseData):
             ]
         }
 
-        result = self.service.spreadsheets().batchUpdate(
+        response = self.service.spreadsheets().batchUpdate(
             spreadsheetId=self.table_id,
-            body=request_body
+            body=request
         ).execute()
 
-        return result
+        return Answer(Request=request, Response=response)
 
-    def rename_column(self, sheet_title: str, old_column_name: str, new_column_name: str) -> dict:
+    def rename_column(self, sheet_title: str, old_column_name: str, new_column_name: str) -> Answer:
 
         sheet_properties = self.get_sheet_properties_by_name(sheet_title)
         sheet_id = sheet_properties['sheetId']
         old_column_index = self.get_column_index_by_name(sheet_title, old_column_name)
 
 
-        requests = [
+        request = [
             {
                 'updateCells': {
                     'rows': [
@@ -183,19 +184,19 @@ class DataDefinition(BaseData):
 
         response = self.service.spreadsheets().batchUpdate(
             spreadsheetId=self.table_id,
-            body={'requests': requests}
+            body={'requests': request}
         ).execute()
 
-        return response
+        return Answer(Request=request, Response=response)
 
 
-    def delete_column(self, sheet_title: str, column_name: str) -> dict:
+    def delete_column(self, sheet_title: str, column_name: str) -> Answer:
         sheet_properties = self.get_sheet_properties_by_name(sheet_title)
 
         sheet_id = sheet_properties['sheetId']
         column_index = self.get_column_index_by_name(sheet_title, column_name)
 
-        requests = [
+        request = [
             {
                 'deleteDimension': {
                     'range': {
@@ -210,18 +211,18 @@ class DataDefinition(BaseData):
 
         response = self.service.spreadsheets().batchUpdate(
             spreadsheetId=self.table_id,
-            body={'requests': requests}
+            body={'requests': request}
         ).execute()
 
-        return response
+        return Answer(Request=request, Response=response)
 
-    def drop_table(self, sheet_title: str) -> dict:
+    def drop_table(self, sheet_title: str) -> Answer:
 
         sheet_properties = self.get_sheet_properties_by_name(sheet_title)
 
         sheet_id = sheet_properties['sheetId']
 
-        requests = [
+        request = [
             {
                 'deleteSheet': {
                     'sheetId': sheet_id
@@ -231,7 +232,7 @@ class DataDefinition(BaseData):
 
         response = self.service.spreadsheets().batchUpdate(
             spreadsheetId=self.table_id,
-            body={'requests': requests}
+            body={'requests': request}
         ).execute()
 
-        return response
+        return Answer(Request=request, Response=response)

@@ -20,14 +20,13 @@ class SQLProcessor():
         self.data_manipulation = data_manipulation
 
     def execute(self, sql_query):
-        if not self.data_difinition.table_id:
+        if not self.data_difinition.table_id and not re.search("CREATE DATABASE (\w+)", sql_query):
             raise ConnectionError()
 
         if sql_query[-1] != ";":
             sql_query += ";"
 
         sql_type = self.__get_query_type(sql_query)
-        print(sql_type)
 
         #DDL
         if sql_type is QueryType.CREATE:
@@ -47,6 +46,9 @@ class SQLProcessor():
 
         if sql_type is QueryType.INSERT:
             return self.__execute_inset(sql_query)
+
+        if sql_type.DELETE is QueryType.DELETE:
+            return self.__execute_delete(sql_query)
 
     def __get_query_type(self, sql_query):
         if re.search(r'^\s*CREATE', sql_query, re.IGNORECASE):
@@ -113,7 +115,7 @@ class SQLProcessor():
 
                 result = self.data_difinition.create_table(table_name, columns)
 
-            return result
+                return result
 
         base_pattern = r'CREATE DATABASE (\w+)'
         table_match = re.search(base_pattern, sql_query)
@@ -139,10 +141,6 @@ class SQLProcessor():
                 columns = columns_match.group(1).split(',')
 
                 columns = [column.strip() for column in columns]
-
-                for column in columns:
-                    print(column)
-
 
                 result = self.data_difinition.alert_column(table_name, columns)
 
@@ -213,5 +211,16 @@ class SQLProcessor():
                 columns = [column.strip() for column in columns]
 
             result = self.data_manipulation.insert_data(table_name, values, columns)
+
+            return result
+
+    def __execute_delete(self, sql_query):
+        table_pattern = r'DELETE FROM (\w+)'
+        table_match = re.search(table_pattern, sql_query)
+        if table_match:
+            table_name = table_match.group(1)
+            new_query = sql_query.replace("DELETE ", "SELECT * ")
+
+            result = self.data_manipulation.delete_rows(table_name, new_query)
 
             return result

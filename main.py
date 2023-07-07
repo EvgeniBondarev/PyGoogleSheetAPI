@@ -9,16 +9,14 @@ if __name__ == '__main__':
 
     sql.authorization("files//credentials.json")
 
-    # res = sql.execute("CREATE DATABASE TestBase")
-    #391_zzvvCQyOiwHiBGM7tICiDUUm8iTIGEQBs1tVRYo1
+    sql.connect(GsDataBase(id="1k34kd8Cw4IT6jK7O0q06r-egBY1mSXu7su0ZLemR8Zk", name="Users"))
 
-    sql.connect(GsDataBase("1391_zzvvCQyOiwHiBGM7tICiDUUm8iTIGEQBs1tVRYo", "TestBase"))
-    # create = sql.execute("CREATE TABLE 1 (id, first_name, last_name, email, gender, ip_address)")
-    # move = sql.execute("ALTER TABLE 1 ALTER COLUMN ID, first_name, last_name, email, gender, ip_address")
-    # rename = sql.execute("ALTER TABLE 1 RENAME COLUMN email TO Email")
-    # delete = sql.execute("DROP TABLE 1")
-    select = sql.execute("SELECT * FROM Users WHERE id = '10'")
-    print(select)
+    query = sql.execute("SELECT * FROM Users")
+
+    pprint(query.Response)
+
+
+
 
 
 

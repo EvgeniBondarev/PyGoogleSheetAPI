@@ -4,6 +4,7 @@ from .Exceptions import *
 
 class BaseData:
     def __init__(self, credentials):
+        self.credentials = credentials
         self.service = None
         self.__authenticate(credentials)
 
