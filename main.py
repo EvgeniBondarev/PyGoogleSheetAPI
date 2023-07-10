@@ -11,9 +11,10 @@ if __name__ == '__main__':
 
     sql.connect(GsDataBase(id="1k34kd8Cw4IT6jK7O0q06r-egBY1mSXu7su0ZLemR8Zk", name="Users"))
 
-    query = sql.execute("SELECT * FROM Users")
+    query = sql.execute("UPDATE UserData SET name = aboba, id = 1000 WHERE id = 10")
+    print(query)
 
-    pprint(query.Response)
+
 
 
 

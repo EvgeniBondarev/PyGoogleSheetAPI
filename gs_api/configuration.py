@@ -1,5 +1,6 @@
-from .data_manipulation import ResponseType
+from .dataclasses import ResponseType
+
 
 COLUMN_COLOR = [(0.85, 0.85, 0.85)]
 
-RESPONSE_TYPE = ResponseType.Value
+RESPONSE_TYPE = ResponseType.DataFrame

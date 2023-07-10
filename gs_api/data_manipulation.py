@@ -1,18 +1,14 @@
 import pandas as pd
 import pandasql as ps
-from typing import List
-from enum import Enum
+from typing import List, Any, Dict
 
 from .Exceptions import *
 from .BaseData import BaseData
-from .dataclasses import Answer
+from .dataclasses import Answer, ResponseType
 from .configuration import RESPONSE_TYPE
 
 
-class ResponseType(Enum):
-    DataFrame = "DataFrame"
-    List = "List"
-    Value = "Value"
+
 class DataManipulation(BaseData):
 
     def read_all_data_from_sheet(self, title):
@@ -76,9 +72,9 @@ class DataManipulation(BaseData):
             if len(columns) != len(data):
                 raise NumberOfColumns(columns, values)
 
-            for col_name in range(len(columns)):
-                if columns[col_name] != values[0][col_name]:
-                    raise InvalidColumnName(title, columns[col_name])
+            for column in columns:
+                if column not in values[0]:
+                    raise InvalidColumnName(title, column)
 
 
         value_dict = {}
@@ -111,7 +107,6 @@ class DataManipulation(BaseData):
 
     def delete_rows(self, title: str, sql_query: str) -> Answer:
         values_to_delete = self.select_data(title, sql_query, ResponseType.List)
-        print(values_to_delete)
 
         range_name = f'{title}!A2:ZZ'
         result = self.service.spreadsheets().values().get(
@@ -129,11 +124,10 @@ class DataManipulation(BaseData):
         rows_to_delete = []
 
         for i, row in enumerate(values):
-            print(row)
-            if row in values_to_delete:
+            if row in values_to_delete.Response:
                 rows_to_delete.append(i + 1)
 
-        rows_to_delete.sort(reverse=True)# Это полная жопа
+        rows_to_delete.sort(reverse=True)
 
 
         if not rows_to_delete:
@@ -162,7 +156,66 @@ class DataManipulation(BaseData):
 
         return Answer(Request=request, Response=response)
 
+    def update_rows(self, title: str, sql_query, column_values: Dict[str, Any]) -> Answer:
+        values_to_update = self.select_data(title, sql_query, ResponseType.List)
 
+        range_name = f'{title}!A2:ZZ'
+        result = self.service.spreadsheets().values().get(
+            spreadsheetId=self.table_id,
+            range=range_name).execute()
+
+        values = result.get('values', [])
+
+        sheet_properties = self.get_sheet_properties_by_name(title)
+        sheet_id = sheet_properties['sheetId']
+
+        if not values:
+            return Answer(Request=None, Response={"response": "Table is empty"})
+
+        rows_to_update = []
+
+        for i, row in enumerate(values):
+            if row in values_to_update.Response:
+                rows_to_update.append(i + 1)
+
+        if not rows_to_update:
+            return Answer(Request=None, Response={"response": "Rows to update not found"})
+
+        requests = []
+        for row_index in rows_to_update:
+            for column_name, value in column_values.items():
+                column_index = self.get_column_index_by_name(title, column_name)
+
+                requests.append({
+
+                        'updateCells': {
+                            'rows': [
+                                {
+                                    'values': [
+                                        {
+                                            'userEnteredValue': {
+                                                'stringValue': value
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            'fields': 'userEnteredValue',
+                            'start': {
+                                'sheetId': sheet_id,
+                                'rowIndex': row_index,
+                                'columnIndex': column_index
+                            }
+                        }
+                    }
+                )
+
+        resonse = self.service.spreadsheets().batchUpdate(
+            spreadsheetId=self.table_id,
+            body={'requests': requests}
+        ).execute()
+
+        return Answer(Request=requests, Response=resonse)
 
 
 

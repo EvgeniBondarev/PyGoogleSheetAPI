@@ -1,20 +1,10 @@
 import re
 from googleapiclient.errors import HttpError
-from enum import Enum
+
+from .dataclasses import QueryType
 
 
-class QueryType(Enum):
-    CREATE = "CREATE"
-    SELECT = "SELECT"
-    INSERT = "INSERT"
-    UPDATE = "UPDATE"
-    DELETE = "DELETE"
-    ALTER = "ALTER"
-    DROP = "DROP"
-    UNKNOWN = "Unknown"
-
-class SQLProcessor():
-
+class SQLParser():
     def __init__(self, data_difinition, data_manipulation=None):
         self.data_difinition = data_difinition
         self.data_manipulation = data_manipulation
@@ -46,6 +36,9 @@ class SQLProcessor():
 
         if sql_type is QueryType.INSERT:
             return self.__execute_inset(sql_query)
+
+        if sql_type is QueryType.UPDATE:
+            return self.__execute_update(sql_query)
 
         if sql_type.DELETE is QueryType.DELETE:
             return self.__execute_delete(sql_query)
@@ -213,6 +206,19 @@ class SQLProcessor():
             result = self.data_manipulation.insert_data(table_name, values, columns)
 
             return result
+    def __execute_update(self, sql_query):
+        table_name = re.search(r'UPDATE\s+(\w+)', sql_query).group(1)
+
+        column_values = re.findall(r'SET\s+(.*?)\s+WHERE', sql_query, re.DOTALL)[0]
+        columns = re.findall(r'(\w+)\s*=\s*(\w+)', column_values)
+        column_dict = {column: value for column, value in columns}
+
+        new_query = re.sub(r'.*?(?=WHERE)', f'SELECT * FROM {table_name} ', sql_query, count=1)
+        result = self.data_manipulation.update_rows(table_name, new_query, column_dict)
+
+        return result
+
+
 
     def __execute_delete(self, sql_query):
         table_pattern = r'DELETE FROM (\w+)'
