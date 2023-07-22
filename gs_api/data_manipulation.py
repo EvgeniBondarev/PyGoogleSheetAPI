@@ -34,6 +34,37 @@ class DataManipulation(BaseData):
 
         result = ps.sqldf(new_query)
 
+        return self.__return_data_by_type(sql_query, result, response_type)
+
+
+
+    def select_join_data(self, sql_query,
+                         main_table,
+                         dependent_tables,
+                         response_type: ResponseType = RESPONSE_TYPE):
+
+        main_data = self.read_all_data_from_sheet(main_table)
+        dependent_data = self.read_all_data_from_sheet(dependent_tables[0])
+
+        columns = main_data[0]
+        main_data.pop(0)
+        main_df = pd.DataFrame(main_data, columns=columns)
+
+        columns = dependent_data[0]
+        dependent_data.pop(0)
+        dependent_df = pd.DataFrame(dependent_data, columns=columns)
+
+
+        new_query = sql_query.replace(main_table, "main_df").replace(dependent_tables[0], "dependent_df")
+
+        result = ps.sqldf(new_query)
+
+        return self.__return_data_by_type(sql_query, result, response_type)
+
+    def __replace_table_name(self):
+        pass
+
+    def __return_data_by_type(self, sql_query, result, response_type):
         if response_type is ResponseType.Value:
             return Answer(Request={"request": sql_query}, Response=self.__dataframe_to_value(result))
 

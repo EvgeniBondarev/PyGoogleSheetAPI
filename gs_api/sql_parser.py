@@ -179,8 +179,18 @@ class SQLParser():
         table_match = re.search(table_pattern, sql_query)
         if table_match:
             table_name = table_match.group(1)
-            result = self.data_manipulation.select_data(table_name, sql_query)
-            return result
+            if re.search(r"\bINNER\s+JOIN\b", sql_query, re.IGNORECASE):
+                dependent_tables = re.findall(r"\bINNER\s+JOIN\s+(\w+)\b", sql_query, re.IGNORECASE)
+
+                if dependent_tables:
+                    print(table_name)
+                    print(dependent_tables)
+                    result = self.data_manipulation.select_join_data(sql_query, table_name, dependent_tables)
+                    return result
+
+            else:
+                result = self.data_manipulation.select_data(table_name, sql_query)
+                return result
 
     def __execute_inset(self, sql_query):
         table_pattern = r'INSERT INTO (\w+)'
