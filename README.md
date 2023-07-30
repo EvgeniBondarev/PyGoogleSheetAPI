@@ -15,7 +15,7 @@ pip install gs-sql
 
 Or from Github:
 ```python
-https://github.com/EvgeniBondarev/PyGoogleSheetAPI/archive/refs/heads/main.zip
+https://github.com/EvgeniBondarev/gs-sql/archive/refs/heads/main.zip
 ```
 
 ## Usage
@@ -23,7 +23,7 @@ https://github.com/EvgeniBondarev/PyGoogleSheetAPI/archive/refs/heads/main.zip
 At the first login, a browser window will open for confirmation, and a token.pickle file will be created in the directory where your credentials.json file is located to interact with the API.
 
 ```python
-from gs_api.sheetsql import SheetsQL
+from gs_sql.sheetsql import SheetsQL
 
 gs = SheetsQL()
 
@@ -31,7 +31,7 @@ gs.authorization("files//credentials.json")
 ```
 Afterwards, you can create a table/database in Google Sheets either using standard methods or through SQL queries.
 ```python
-from gs_api.dataclasses import GsDataBase
+from gs_sql.dataclasses import GsDataBase
 
 new_base = gs.execute("""CREATE DATABASE NewBase""")
 
@@ -43,7 +43,7 @@ query = gs.execute("CREATE TABLE Users (id, name)")
 ```
 Final code.
 ```python
-from gs_api.sheetsql import SheetsQL
+from gs_sql.sheetsql import SheetsQL
 
 
 gs = SheetsQL()
