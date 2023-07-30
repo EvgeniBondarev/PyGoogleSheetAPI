@@ -1,5 +1,6 @@
-from gs_api.sheetsql import SheetsQL
-from gs_api.dataclasses import GsDataBase
+from gs_sql.sheetsql import SheetsQL
+from gs_sql.dataclasses import ResponseType
+from gs_sql.dataclasses import GsDataBase
 
 # SQL COMMANDS: http://www.postgresql.org/docs/8.3/interactive/sql-commands.html
 if __name__ == '__main__':
@@ -7,14 +8,15 @@ if __name__ == '__main__':
 
     sql.authorization("files//credentials.json")
 
-    sql.connect(GsDataBase(id="1k34kd8Cw4IT6jK7O0q06r-egBY1mSXu7su0ZLemR8Zk", name="Users"))
+    sql.set_configuration(colum_color=[(0.85, 0.85, 0.85)], response_type=ResponseType.List)
 
-    query = sql.execute("""SELECT UserData.name, UserData.password, Chats.message
-                            FROM UserData
-                            INNER JOIN Chats ON UserData.id=Chats.user;""")
+    new_base = sql.execute("""CREATE DATABASE NewBase1""")
 
+    sql.connect(new_base)
 
-    print(query.Response)
+    query = sql.execute("CREATE TABLE Users (id, name)")
+    print(query)
+
 
 
 

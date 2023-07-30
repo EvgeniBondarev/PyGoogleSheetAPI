@@ -92,8 +92,6 @@ class SQLParser():
                     return None
 
 
-
-
         table_pattern = r'CREATE TABLE (\w+)'
         table_match = re.search(table_pattern, sql_query)
         if table_match:
@@ -118,9 +116,6 @@ class SQLParser():
             result = self.data_difinition.create_database(base_name)
 
             return result
-
-
-
 
     def __execute_alert(self, sql_query):
         table_pattern = r'ALTER TABLE (\w+)'
@@ -183,8 +178,6 @@ class SQLParser():
                 dependent_tables = re.findall(r"\bINNER\s+JOIN\s+(\w+)\b", sql_query, re.IGNORECASE)
 
                 if dependent_tables:
-                    print(table_name)
-                    print(dependent_tables)
                     result = self.data_manipulation.select_join_data(sql_query, table_name, dependent_tables)
                     return result
 

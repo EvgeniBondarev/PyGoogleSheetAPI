@@ -4,7 +4,7 @@ from .data_difinition import DataDefinition
 from .data_manipulation import DataManipulation
 from .sql_parser import SQLParser
 from .dataclasses import GsDataBase, Answer, ResponseType
-import gs_api.configuration as  configuration
+import gs_sql.configuration as  configuration
 
 
 class SheetsQL:

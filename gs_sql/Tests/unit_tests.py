@@ -1,7 +1,7 @@
 from unittest import TestCase, main
 
-from gs_api.sheetsql import SheetsQL
-from gs_api.dataclasses import GsDataBase, ResponseType
+from gs_sql.sheetsql import SheetsQL
+from gs_sql.dataclasses import GsDataBase, ResponseType
 
 
 
